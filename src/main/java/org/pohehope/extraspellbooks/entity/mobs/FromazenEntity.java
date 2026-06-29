@@ -489,7 +489,6 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
                 PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 25)
         ));
 
-        // 🏹 中距離（6.0 〜 12.0マス）：30Tick(1.5秒)溜めてからアイススパイク
         registerPattern(new ActionPattern("ice_spike", 1, 12.0, 15.0,
                 PatternAction.wait(15),
                 PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 5),
@@ -500,7 +499,7 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
                 PatternAction.wait(20)
         ));
 
-        registerPattern(new ActionPattern("flost_dash", 1, 8.0, 26.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
+        registerPattern(new ActionPattern("flost_dash", 1, 8.0, 26.0,
                 PatternAction.down(10),
                 PatternAction.spell(Modspellregistry.FROST_DASH.get(), 12),
                 PatternAction.wait(5),

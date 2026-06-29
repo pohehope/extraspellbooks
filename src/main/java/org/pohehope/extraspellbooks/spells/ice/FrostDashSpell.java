@@ -121,7 +121,6 @@ public class FrostDashSpell extends AbstractSpell {
                 final Vec3 spawnPos = startPos.add(finalForward.scale(i * 1.2));
 
                 level.getServer().tell(new net.minecraft.server.TickTask(level.getServer().getTickCount() + delayTicks, () -> {
-                    // ※ Snowball（雪玉）自体には setDamage メソッドがないので、
                     // Iron's Spells の IceSpikeEntity や FireboltEntity、あるいはカスタムの弾と仮定します
                     Snowball icicleProjectile = new Snowball(level, caster);
 
