@@ -11,6 +11,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.BossEvent;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -20,6 +21,7 @@ import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.pohehope.extraspellbooks.registry.Modspellregistry;
 
@@ -78,6 +80,11 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
                 .add(Attributes.FOLLOW_RANGE, 128.0)
                 .add(Attributes.ATTACK_DAMAGE, 6.0);
     }
+
+    @Override
+    public boolean isPushable() {return false;}
+    @Override
+    protected void doPush(@NotNull Entity entity) {}
 
     @Override
     public void startSeenByPlayer(ServerPlayer player) { super.startSeenByPlayer(player); this.bossEvent.addPlayer(player); }
@@ -146,6 +153,33 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
         if (this.level().isClientSide() || !this.isAlive()) {
             spawnActionParticles();
             return;
+        }
+
+        if (!this.level().isClientSide && this.isAlive()) {
+
+            // 自分の現在のAABB（当たり判定の箱）を取得
+            net.minecraft.world.phys.AABB boundingBox = this.getBoundingBox();
+
+            // 自分のAABBに「接触している」Entity（LivingEntity）をすべてリストアップする
+            // ただし自分自身（this）は除外する
+            java.util.List<LivingEntity> targets = this.level().getEntitiesOfClass(
+                    LivingEntity.class,
+                    boundingBox,
+                    entity -> entity != this && entity.isAlive()
+            );
+
+            // 触れているターゲット全員にダメージを与える
+            for (LivingEntity target : targets) {
+                // ダメージソースの設定（1.20.1ではダメージタイプのシステムが変わったため、level().damageSources() を使います）
+                // Mobの直接攻撃（mobAttack）として扱い、自分を原因として設定
+                net.minecraft.world.damagesource.DamageSource damageSource = this.level().damageSources().mobAttack(this);
+
+                // 接触ダメージの量（例: 4.0 = ハート2個分）
+                // 属性値から取得したい場合は、(float)this.getAttributeValue(Attributes.ATTACK_DAMAGE) でもOKです
+                float damageAmount = (float) this.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE);
+                // ターゲットにダメージを与える
+                target.hurt(damageSource, damageAmount);
+            }
         }
 
         this.resetFallDistance(); // 飛行Mobの落下距離リセット
@@ -466,7 +500,18 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
                 PatternAction.wait(20)
         ));
 
-        registerPattern(new ActionPattern("snow_pan", 1, 15.0, 29.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
+        registerPattern(new ActionPattern("flost_dash", 1, 8.0, 26.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
+                PatternAction.down(10),
+                PatternAction.spell(Modspellregistry.FROST_DASH.get(), 12),
+                PatternAction.wait(5),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
+                PatternAction.down(10),
+                PatternAction.spell(Modspellregistry.FROST_DASH.get(), 12),
+                PatternAction.wait(5),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30)
+        ));
+
+        registerPattern(new ActionPattern("snow_pan", 1, 26.0, 34.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
                 PatternAction.wait(5),
                 PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
                 PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
@@ -479,7 +524,7 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
                 PatternAction.wait(5)
         ));
 
-        registerPattern(new ActionPattern("not_snow_pan", 1, 15.0, 29.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
+        registerPattern(new ActionPattern("not_snow_pan", 1, 26.0, 34.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
                 PatternAction.wait(5),
                 PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
                 PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
@@ -494,7 +539,7 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
                 PatternAction.wait(5)
         ));
 
-        registerPattern(new ActionPattern("snow_pans", 1, 29.0, 49.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
+        registerPattern(new ActionPattern("snow_pans", 1, 34.0, 49.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
                 PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 15),
                 PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),
                 PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),

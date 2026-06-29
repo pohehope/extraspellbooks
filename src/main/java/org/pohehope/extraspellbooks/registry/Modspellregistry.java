@@ -58,4 +58,7 @@ public class Modspellregistry {
 
     public static final RegistryObject<AbstractSpell> FALL_SNOWBALL =
             SPELLS.register("fall_snowball", SnowBallFallSpell::new);
+
+    public static final RegistryObject<AbstractSpell> FROST_DASH =
+            SPELLS.register("frost_dash", FrostDashSpell::new);
 }
