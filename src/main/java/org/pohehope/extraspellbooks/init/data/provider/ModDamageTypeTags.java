@@ -1,0 +1,25 @@
+package org.pohehope.extraspellbooks.init.data.provider;
+
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.data.DataGenerator;
+import net.minecraft.data.tags.TagsProvider;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraftforge.common.data.ExistingFileHelper;
+import org.pohehope.extraspellbooks.Extraspellbooks;
+import org.pohehope.extraspellbooks.registry.ModDamageTypes;
+
+import java.util.concurrent.CompletableFuture;
+
+public class ModDamageTypeTags extends TagsProvider<DamageType> {
+    public ModDamageTypeTags(DataGenerator generator, CompletableFuture<HolderLookup.Provider> future, ExistingFileHelper helper) {
+        super(generator.getPackOutput(), Registries.DAMAGE_TYPE, future, Extraspellbooks.MODID, helper);
+    }
+
+    @Override
+    protected void addTags(HolderLookup.Provider p_256380_) {
+        this.tag(DamageTypeTags.BYPASSES_INVULNERABILITY).add(ModDamageTypes.NIGHT);
+        this.tag(DamageTypeTags.BYPASSES_COOLDOWN).add(ModDamageTypes.NIGHT);
+    }
+}

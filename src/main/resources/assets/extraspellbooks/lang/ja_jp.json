@@ -1,0 +1,25 @@
+{
+  "spell.extraspellbooks.lowvoltagemissile": "低電圧ミサイル",
+  "spell.extraspellbooks.burningsoul": "燃え盛る魂",
+  "spell.extraspellbooks.cucumber": "キ　ュ　ウ　リ　！",
+  "spell.extraspellbooks.carrots": "ニ　ン　ジ　ン　！",
+  "spell.extraspellbooks.freezesoul": "凍り付く魂",
+  "spell.extraspellbooks.hemostasis": "止血",
+
+  "spell.extraspellbooks.lowvoltagemissile.guide": "強いホーミング性能を持つ雷を出す",
+  "spell.extraspellbooks.burningsoul.guide": "魂が燃え、対価として移動速度と攻撃力が上がる。",
+  "spell.extraspellbooks.cucumber.guide": "キュウリを発射する。",
+  "spell.extraspellbooks.carrots.guide": "ニンジンをどこからともなく出現させ、周囲に強烈な持続ダメージを与える。",
+  "spell.extraspellbooks.freezesoul.guide": "魂が凍り付き、耐火としてとてつもない防御力を得る。",
+  "spell.extraspellbooks.hemostasis.guide": "負傷箇所を魔力で補修することで、ある程度のダメージを軽減する。",
+
+  "effect.extraspellbooks.burningsoul": "燃え盛る魂",
+  "effect.extraspellbooks.freezesoul": "凍り付く魂",
+  "effect.extraspellbooks.hemostasis": "止血",
+
+  "effect.extraspellbooks.burningsoul.description": "燃え盛る魂",
+  "effect.extraspellbooks.freezesoul.description": "凍り付く魂",
+  "effect.extraspellbooks.hemostasis.description": "止血",
+
+  "school.extraspellbooks.night": "夜"
+}
