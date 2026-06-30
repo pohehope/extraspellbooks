@@ -18,6 +18,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.control.FlyingMoveControl;
 import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
+import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.level.Level;
@@ -74,11 +75,11 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
     public static AttributeSupplier.Builder createLivingAttributes() {
         return Monster.createMonsterAttributes()
                 .add(Attributes.MAX_HEALTH, 1000.0)
-                .add(Attributes.ARMOR, 7)
-                .add(Attributes.MOVEMENT_SPEED, 0.55)
-                .add(Attributes.FLYING_SPEED, 0.55)
+                .add(Attributes.ARMOR, 10)
+                .add(Attributes.MOVEMENT_SPEED, 0.85)
+                .add(Attributes.FLYING_SPEED, 0.85)
                 .add(Attributes.FOLLOW_RANGE, 128.0)
-                .add(Attributes.ATTACK_DAMAGE, 6.0);
+                .add(Attributes.ATTACK_DAMAGE, 40.0);
     }
 
     @Override
@@ -182,6 +183,37 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
             }
         }
 
+// === ❄️ 周囲のモブの飛行を禁止するオーラ ===
+        double auraRadius = 24.0;
+        net.minecraft.world.phys.AABB flightBanBox = this.getBoundingBox().inflate(auraRadius);
+
+        java.util.List<LivingEntity> nearbyEntities = this.level().getEntitiesOfClass(
+                LivingEntity.class,
+                flightBanBox,
+                entity -> entity != this && entity.isAlive() && !(entity instanceof net.minecraft.world.entity.player.Player)
+        );
+
+        for (LivingEntity entity : nearbyEntities) {
+            // モブの真下にある地表のY座標を取得
+            int groundY = this.level().getHeight(
+                    net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,
+                    entity.blockPosition().getX(),
+                    entity.blockPosition().getZ()
+            );
+
+            double heightFromGround = entity.getY() - groundY;
+
+            if (heightFromGround > 9.5) {
+
+                // --- 1. 通常のMob用（Vexや通常の飛行Mob対策） ---
+                if (entity.isNoGravity()) entity.setNoGravity(false);
+
+                entity.moveTo(entity.getX(), groundY, entity.getZ());
+
+                entity.resetFallDistance();
+            }
+        }
+
         this.resetFallDistance(); // 飛行Mobの落下距離リセット
 
         LivingEntity target = this.getTarget();
@@ -282,48 +314,67 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
 
     private void selectNextPattern(LivingEntity target) {
         if (target == null) return;
-
         double distance = this.distanceTo(target);
 
         // 💡 現在の自分の真下にある地面（地表ブロック）のY座標と、地面からの高さを計算
         int groundY = this.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, this.blockPosition().getX(), this.blockPosition().getZ());
         double heightFromGround = this.getY() - groundY;
 
+
         // 登録された全パターンの中から条件に合うものを抽出
         List<ActionPattern> available = this.allPatterns.stream()
                 .filter(p -> distance >= p.minDist() && distance <= p.maxDist())
                 .filter(p -> {
-                    // =================================================================
-                    // ❄️ 【修正版】地面からの距離（高度）による魔法（パターン）の制限ルール
-                    // =================================================================
+                    // 🩸 確実に小数で計算するために (double) を明示
+                    double healthpoint = (double) this.getHealth() / this.getMaxHealth();
 
-                    // 🔽 【地上限定技】地面からの高さが 8.0 マスより高いときは「使えない(false)」
-                    if (p.name().equals("snowy_area") && heightFromGround > 8.0) {
-                        return false;
-                    }
-                    if (p.name().equals("ice_spike_min") && heightFromGround > 8.0) {
-                        return false;
-                    }
-                    if (p.name().equals("snow_pan") && heightFromGround > 8.0) {
-                        return false;
-                    }
+            /*===================
+                   health判定
+             ===================*/
+                    if (healthpoint <= 0.5){
+                        // 🔽 HP半分以上の時は使えない技（第2段階用・高度制限用の技など）
+                        if (
+                                p.name().equals("ice_spike_min") ||
+                                        p.name().equals("snowy_area") ||
+                                        p.name().equals("not_ice_spike_min") ||
+                                        p.name().equals("not_snowy_area") ||
+                                        p.name().equals("ice_spike") ||
+                                        p.name().equals("flost_dash") || // 💡 必要に応じて frost_dash に修正
+                                        p.name().equals("snow_pan") ||
+                                        p.name().equals("not_snow_pan") ||
+                                        p.name().equals("snow_pa") ||    // 💡 必要に応じて確認
+                                        p.name().equals("bear")
+                        ) {return false;}
 
-                    // 🔽 【空中限定技】地面からの高さが 8.0 マス未満（地上に近い）のときは「使えない(false)」
-                    if (p.name().equals("not_snowy_area") && heightFromGround < 8.0) {
-                        return false; // 💡 falseに修正（プールから除外する）
-                    }
-                    if (p.name().equals("not_ice_spike_min") && heightFromGround < 8.0) {
-                        return false; // 💡 falseに修正（プールから除外する）
-                    }
-                    if (p.name().equals("not_snow_pan") && heightFromGround < 8.0) {
-                        return false; // 💡 falseに修正（プールから除外する）
-                    }
+                        // 🔽 HP半分以上の時に確定で使わせたい通常技（これらは下の return true でも通るので、省略してもOKです）
+                        if (p.name().equals("ice_spike_strike") ||
+                                p.name().equals("strong_frost_dash") ||
+                                p.name().equals("ice_bomb")
+                        ) {return true;}
 
-                    // 全ての除外フィルターをすり抜けた技だけが、最終的に候補（true）として残る
+                    } else {
+                        // =================================================================
+                        // ❄️ HPが半分未満の時（第2段階）：高度制限 ＆ 大技の解禁
+                        // =================================================================
+
+                        // 🔽 【地上限定技】地面からの高さが 8.0 マスより高いときは「使えない(false)」
+                        if (p.name().equals("snowy_area") && heightFromGround > 8.0) {return false;}
+                        if (p.name().equals("ice_spike_min") && heightFromGround > 8.0) {return false;}
+                        if (p.name().equals("snow_pan") && heightFromGround > 8.0) {return false;}
+
+                        // 🔽 【空中限定技】地面からの高さが 8.0 マス未満（地上に近い）のときは「使えない(false)」
+                        if (p.name().equals("not_snowy_area") && heightFromGround < 8.0) {return false;}
+                        if (p.name().equals("not_ice_spike_min") && heightFromGround < 8.0) {return false;}
+                        if (p.name().equals("not_snow_pan") && heightFromGround < 8.0) {return false;}
+
+                        // 🔽 【大技の禁止判定】HP半分未満の時は、逆にこれらの大技を「使えなくする(false)」
+                        if (
+                                p.name().equals("ice_spike_strike") || p.name().equals("strong_frost_dash") || p.name().equals("ice_bomb")
+                        ) {return false;}
+                    }
+                    // 上記のどの false 条件にも引っかからなかった技が候補に残る
                     return true;
-                    // =================================================================
-                })
-                .toList();
+                }).toList();
 
         if (!available.isEmpty()) {
             this.actionPattern = available.get(RANDOM.nextInt(available.size()));
@@ -401,6 +452,18 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
                     y + 1.5,
                     z + (RANDOM.nextDouble() - 0.5) * 1.2,
                     0, -0.02, 0);
+            this.level().addParticle(ParticleTypes.FIREWORK,
+                    x + (RANDOM.nextDouble() - 0.5) * 1.5,
+                    y + (RANDOM.nextDouble() - 0.5) * 1.5,
+                    z + (RANDOM.nextDouble() - 0.5) * 1.5,
+                    0, 0, 0);
+            if ((double) this.getHealth() / this.getMaxHealth() <= 0.5) {
+                this.level().addParticle(ParticleTypes.SOUL,
+                        x + (RANDOM.nextDouble() - 0.5) * 2.5,
+                        y + (RANDOM.nextDouble() - 0.5) * 2.5,
+                        z + (RANDOM.nextDouble() - 0.5) * 2.5,
+                        0, -0.02, 0);
+            }
         }
         // =================================================================
 
@@ -442,129 +505,182 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
     // --- パターン登録エリア ---
     private void initPatterns() {
         this.allPatterns.clear();
+            registerPattern(new ActionPattern("ice_spike_min", 1, 0.0, 3.0,
+                    PatternAction.down(60),
+                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30),
+                    PatternAction.wait(20),
+                    PatternAction.spell(SpellRegistry.FROSTWAVE_SPELL.get(), 50),
+                    PatternAction.move(-20),
+                    PatternAction.wait(5) // 魔法を撃ったあと2秒間(40Tick)のクールダウン
+            ));
 
-        registerPattern(new ActionPattern("ice_spike_min", 1, 0.0, 3.0,
-                PatternAction.down(60),
-                PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30),
-                PatternAction.wait(20),
-                PatternAction.spell(SpellRegistry.FROSTWAVE_SPELL.get(), 50),
-                PatternAction.move(-20),
-                PatternAction.wait(5) // 魔法を撃ったあと2秒間(40Tick)のクールダウン
-        ));
+            registerPattern(new ActionPattern("snowy_area", 1, 3.0, 12.0,
+                    PatternAction.move(10),
+                    PatternAction.spell(SpellRegistry.FROSTWAVE_SPELL.get(), 10),
+                    PatternAction.move(-30),
+                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 25),
+                    PatternAction.wait(5),
+                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 25),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
+                    PatternAction.wait(5) // 魔法を撃ったあと2秒間(40Tick)のクールダウン
+            ));
 
-        registerPattern(new ActionPattern("snowy_area", 1, 3.0, 12.0,
-                PatternAction.move(10),
-                PatternAction.spell(SpellRegistry.FROSTWAVE_SPELL.get(), 10),
-                PatternAction.move(-30),
-                PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 25),
-                PatternAction.wait(5),
-                PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 25),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
-                PatternAction.wait(5) // 魔法を撃ったあと2秒間(40Tick)のクールダウン
-        ));
+            registerPattern(new ActionPattern("not_ice_spike_min", 1, 0.0, 3.0,
+                    PatternAction.down(60),
+                    PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
+                    PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
+                    PatternAction.wait(10),
+                    PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
+                    PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
+                    PatternAction.move(-20),
+                    PatternAction.wait(5) // 魔法を撃ったあと2秒間(40Tick)のクールダウン
+            ));
 
-        registerPattern(new ActionPattern("not_ice_spike_min", 1, 0.0, 3.0,
-                PatternAction.down(60),
-                PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
-                PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
-                PatternAction.wait(10),
-                PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
-                PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
-                PatternAction.move(-20),
-                PatternAction.wait(5) // 魔法を撃ったあと2秒間(40Tick)のクールダウン
-        ));
+            registerPattern(new ActionPattern("not_snowy_area", 1, 3.0, 12.0,
+                    PatternAction.move(10),
+                    PatternAction.spell(SpellRegistry.FROSTWAVE_SPELL.get(), 10),
+                    PatternAction.wait(30),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 25),
+                    PatternAction.wait(5),
+                    PatternAction.spell(Modspellregistry.ICE_CAGE.get(), 20),
+                    PatternAction.spell(SpellRegistry.ICE_TOMB_SPELL.get(), 20),
+                    PatternAction.wait(20),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
+                    PatternAction.spell(SpellRegistry.SUMMON_POLAR_BEAR_SPELL.get(), 30),
+                    PatternAction.wait(20),// 魔法を撃ったあと2秒間(40Tick)のクールダウン
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 25)
+            ));
 
-        registerPattern(new ActionPattern("not_snowy_area", 1, 3.0, 12.0,
-                PatternAction.move(10),
-                PatternAction.spell(SpellRegistry.FROSTWAVE_SPELL.get(), 10),
-                PatternAction.wait(30),
-                PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 25),
-                PatternAction.wait(5),
-                PatternAction.spell(Modspellregistry.ICE_CAGE.get(), 20),
-                PatternAction.spell(SpellRegistry.ICE_TOMB_SPELL.get(), 20),
-                PatternAction.wait(20),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
-                PatternAction.spell(SpellRegistry.SUMMON_POLAR_BEAR_SPELL.get(), 30),
-                PatternAction.wait(20),// 魔法を撃ったあと2秒間(40Tick)のクールダウン
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 25)
-        ));
+            registerPattern(new ActionPattern("ice_spike", 1, 12.0, 15.0,
+                    PatternAction.wait(15),
+                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 5),
+                    PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 1),
+                    PatternAction.wait(5),
+                    PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 1),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
+                    PatternAction.wait(20)
+            ));
 
-        registerPattern(new ActionPattern("ice_spike", 1, 12.0, 15.0,
-                PatternAction.wait(15),
-                PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 5),
-                PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 1),
-                PatternAction.wait(5),
-                PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 1),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
-                PatternAction.wait(20)
-        ));
+            registerPattern(new ActionPattern("flost_dash", 1, 8.0, 15.0,
+                    PatternAction.down(8),
+                    PatternAction.spell(Modspellregistry.FROST_DASH.get(), 22),
+                    PatternAction.wait(5),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
+                    PatternAction.down(8),
+                    PatternAction.spell(Modspellregistry.FROST_DASH.get(), 22),
+                    PatternAction.wait(5),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
+                    PatternAction.spell(Modspellregistry.FROST_DASH.get(), 30)
+            ));
 
-        registerPattern(new ActionPattern("flost_dash", 1, 8.0, 26.0,
-                PatternAction.down(10),
-                PatternAction.spell(Modspellregistry.FROST_DASH.get(), 12),
-                PatternAction.wait(5),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
-                PatternAction.down(10),
-                PatternAction.spell(Modspellregistry.FROST_DASH.get(), 12),
-                PatternAction.wait(5),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30)
-        ));
+            registerPattern(new ActionPattern("snow_pan", 1, 15.0, 34.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
+                    PatternAction.wait(5),
+                    PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
+                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 10),
+                    PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
+                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 10),
+                    PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
+                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 10),
+                    PatternAction.spell(Modspellregistry.SNOWFLAKE.get(), 15),
+                    PatternAction.wait(60),
+                    PatternAction.spell(Modspellregistry.FALL_SNOWBALL.get(), 5),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
+                    PatternAction.wait(5)
+            ));
 
-        registerPattern(new ActionPattern("snow_pan", 1, 26.0, 34.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
-                PatternAction.wait(5),
-                PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
-                PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
-                PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
-                PatternAction.spell(Modspellregistry.SNOWFLAKE.get(), 15),
-                PatternAction.wait(60),
-                PatternAction.spell(Modspellregistry.FALL_SNOWBALL.get(), 5),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
-                PatternAction.wait(5)
-        ));
+            registerPattern(new ActionPattern("not_snow_pan", 1, 15.0, 34.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
+                    PatternAction.wait(5),
+                    PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
+                    PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
+                    PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
+                    PatternAction.wait(10),
+                    PatternAction.spell(Modspellregistry.SNOWFLAKE.get(), 15),
+                    PatternAction.spell(Modspellregistry.ICE_CAGE.get(), 20),
+                    PatternAction.wait(20),
+                    PatternAction.spell(SpellRegistry.ICE_TOMB_SPELL.get(), 20),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 15),
+                    PatternAction.wait(5)
+            ));
 
-        registerPattern(new ActionPattern("not_snow_pan", 1, 26.0, 34.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
-                PatternAction.wait(5),
-                PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
-                PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
-                PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 15),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
-                PatternAction.wait(10),
-                PatternAction.spell(Modspellregistry.SNOWFLAKE.get(), 15),
-                PatternAction.spell(Modspellregistry.ICE_CAGE.get(), 20),
-                PatternAction.wait(20),
-                PatternAction.spell(SpellRegistry.ICE_TOMB_SPELL.get(), 20),
-                PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 15),
-                PatternAction.wait(5)
-        ));
+            registerPattern(new ActionPattern("snow_pans", 1, 34.0, 49.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 15),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),
+                    PatternAction.wait(5)
+            ));
 
-        registerPattern(new ActionPattern("snow_pans", 1, 34.0, 49.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
-                PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 15),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),
-                PatternAction.wait(5)
-        ));
+            registerPattern(new ActionPattern("snow_pa", 1, 49.0, 62.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
+                    PatternAction.wait(5),
+                    PatternAction.move(40),
+                    PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 1),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
+                    PatternAction.wait(30)
+            ));
 
-        registerPattern(new ActionPattern("snow_pa", 1, 49.0, 62.0, // Float.MAX_VALUEだと遠すぎてバグる事があるので交戦距離レンジに
-                PatternAction.wait(5),
-                PatternAction.move(40),
-                PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 1),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 50),
-                PatternAction.wait(30)
-        ));
+            registerPattern(new ActionPattern("bear", 1, 32.0, 64.0,
+                    PatternAction.wait(60),
+                    PatternAction.spell(SpellRegistry.SUMMON_POLAR_BEAR_SPELL.get(), 30),
+                    PatternAction.spell(SpellRegistry.SUMMON_POLAR_BEAR_SPELL.get(), 30),
+                    PatternAction.spell(SpellRegistry.SUMMON_POLAR_BEAR_SPELL.get(), 30),
+                    PatternAction.spell(SpellRegistry.SUMMON_POLAR_BEAR_SPELL.get(), 30),
+                    PatternAction.move(60),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),
+                    PatternAction.wait(40) // 魔法を撃ったあと2秒間(40Tick)のクールダウン
+            ));
+            registerPattern(new ActionPattern("ice_spike_min", 1, 0.0, 3.0,
+                    PatternAction.down(60),
+                    PatternAction.spell(SpellRegistry.FROSTWAVE_SPELL.get(), 50),
+                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30),
+                    PatternAction.move(-60),
+                    PatternAction.wait(5)
+            ));
 
-        registerPattern(new ActionPattern("ice_spike_min", 1, 32.0, 64.0,
-                PatternAction.wait(60),
-                PatternAction.spell(SpellRegistry.SUMMON_POLAR_BEAR_SPELL.get(), 30),
-                PatternAction.spell(SpellRegistry.SUMMON_POLAR_BEAR_SPELL.get(), 30),
-                PatternAction.spell(SpellRegistry.SUMMON_POLAR_BEAR_SPELL.get(), 30),
-                PatternAction.spell(SpellRegistry.SUMMON_POLAR_BEAR_SPELL.get(), 30),
-                PatternAction.move(60),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),
-                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 10),
-                PatternAction.wait(40) // 魔法を撃ったあと2秒間(40Tick)のクールダウン
-        ));
+            //ここから2
+
+            registerPattern(new ActionPattern("ice_spike_strike", 1, 12.0, 16.0,
+                    PatternAction.down(60),
+                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30),
+                    PatternAction.wait(5),
+                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30),
+                    PatternAction.wait(5),
+                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30),
+                    PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
+                    PatternAction.wait(1),
+                    PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
+                    PatternAction.move(-60),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
+                    PatternAction.move(-300),
+                    PatternAction.wait(5)
+            ));
+            registerPattern(new ActionPattern("strong_frost_dash", 1, 0.0, 12.0,
+                    PatternAction.spell(Modspellregistry.FROST_DASH.get(), 40),
+                    PatternAction.spell(Modspellregistry.FROST_DASH.get(), 40),
+                    PatternAction.spell(Modspellregistry.FROST_DASH.get(), 40),
+                    PatternAction.spell(Modspellregistry.FROST_DASH.get(), 40),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30)
+            ));
+            registerPattern(new ActionPattern("ice_bomb", 1, 10.0, 90.0,
+                    PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 50),
+                    PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 50),
+                    PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 50),
+                    PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 50),
+                    PatternAction.move(-100),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 50),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 50),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 50),
+                    PatternAction.move(-100),
+                    PatternAction.spell(Modspellregistry.SNOWFLAKE.get(), 50),
+                    PatternAction.spell(Modspellregistry.SNOWFLAKE.get(), 50),
+                    PatternAction.spell(Modspellregistry.SNOWFLAKE.get(), 50),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100)
+            ));
     }
 
     @Override
