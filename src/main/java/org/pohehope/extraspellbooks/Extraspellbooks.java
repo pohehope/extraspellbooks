@@ -22,6 +22,10 @@ import org.pohehope.extraspellbooks.entity.mobs.FromazenRenderer;
 import org.pohehope.extraspellbooks.entity.spells.Meteor.MeteorRenderer;
 import org.pohehope.extraspellbooks.entity.spells.carrots.CarrotsRenderer;
 import org.pohehope.extraspellbooks.entity.spells.cucumber.CucumberRenderer;
+import org.pohehope.extraspellbooks.entity.spells.frostenstrosity.FrostEnstrosityEntity;
+import org.pohehope.extraspellbooks.entity.spells.frostenstrosity.FrostEnstrosityRenderer;
+import org.pohehope.extraspellbooks.entity.spells.plasmadamagebox.PlasmaDamageBoxEntity;
+import org.pohehope.extraspellbooks.entity.spells.plasmadamagebox.PlasmaDamageBoxRenderer;
 import org.pohehope.extraspellbooks.entity.spells.snowflake.SnowFlakeRenderer;
 import org.pohehope.extraspellbooks.registry.*;
 import org.slf4j.Logger;
@@ -61,6 +65,8 @@ public class Extraspellbooks {
                 event.registerEntityRenderer(ModEntityRegistry.METEOR.get(), MeteorRenderer::new);
                 event.registerEntityRenderer(ModEntityRegistry.SNOWFLAKE.get(), SnowFlakeRenderer::new);
                 event.registerEntityRenderer(ModEntityRegistry.FROMAZEN.get(), (EntityRendererProvider.Context renderManager) -> new FromazenRenderer(renderManager));
+                event.registerEntityRenderer(ModEntityRegistry.FROST_ENSTROSITY.get(), FrostEnstrosityRenderer::new);
+                event.registerEntityRenderer(ModEntityRegistry.DAMAGE_BOX.get(), PlasmaDamageBoxRenderer::new);
 
             });
 

@@ -11,6 +11,8 @@ import org.pohehope.extraspellbooks.entity.mobs.FromazenEntity;
 import org.pohehope.extraspellbooks.entity.spells.Meteor.Meteor;
 import org.pohehope.extraspellbooks.entity.spells.carrots.Carrots;
 import org.pohehope.extraspellbooks.entity.spells.cucumber.Cucumber;
+import org.pohehope.extraspellbooks.entity.spells.plasmadamagebox.PlasmaDamageBoxEntity;
+import org.pohehope.extraspellbooks.entity.spells.frostenstrosity.FrostEnstrosityEntity;
 import org.pohehope.extraspellbooks.entity.spells.snowflake.SnowFlake;
 import org.pohehope.extraspellbooks.utils.helper.ResourceLocationHelper;
 
@@ -50,4 +52,16 @@ public class ModEntityRegistry {
                     .sized(1.75F, 1.75F)
                     .clientTrackingRange(64)
                     .build(ResourceLocationHelper.getResouceLocation("fromazen").toString()));
+
+    public static final RegistryObject<EntityType<FrostEnstrosityEntity>> FROST_ENSTROSITY =
+            ENTITIES.register("frost_enstrosity", () -> EntityType.Builder.<FrostEnstrosityEntity>of(FrostEnstrosityEntity::new, MobCategory.MISC)
+                    .sized(0.75F, 0.75F)
+                    .clientTrackingRange(64)
+                    .build(ResourceLocationHelper.getResouceLocation("frost_enstrosity").toString()));
+
+    public static final RegistryObject<EntityType<PlasmaDamageBoxEntity>> DAMAGE_BOX =
+            ENTITIES.register("damage_box", () -> EntityType.Builder.<PlasmaDamageBoxEntity>of(PlasmaDamageBoxEntity::new, MobCategory.MISC)
+                    .sized(1.5F, 1.5F)
+                    .clientTrackingRange(64)
+                    .build(ResourceLocationHelper.getResouceLocation("damage_box").toString()));
 }

@@ -76,8 +76,8 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
         return Monster.createMonsterAttributes()
                 .add(Attributes.MAX_HEALTH, 1000.0)
                 .add(Attributes.ARMOR, 10)
-                .add(Attributes.MOVEMENT_SPEED, 0.85)
-                .add(Attributes.FLYING_SPEED, 0.85)
+                .add(Attributes.MOVEMENT_SPEED, 1.05)
+                .add(Attributes.FLYING_SPEED, 1.05)
                 .add(Attributes.FOLLOW_RANGE, 128.0)
                 .add(Attributes.ATTACK_DAMAGE, 40.0);
     }
@@ -100,7 +100,7 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
     public record CastEntity(AbstractSpell spell, int customCastTime, int level) {}
 
     public enum PatternActionType {
-        WAIT, MOVE, DOWN, CAST_SPELL, MY_CAST, CAST_MULTI
+        WAIT, MOVE, DOWN, CAST_SPELL, MY_CAST, CAST_MULTI, MOVE_CAST
     }
 
     // 複雑な引数はファクトリメソッドで生成するように整理
@@ -129,8 +129,9 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
             return new PatternAction(PatternActionType.CAST_SPELL, 10, List.of(spell), List.of(), 0, level);
         }
 
-        public static PatternAction multiSpell(List<AbstractSpell> spells, int interval) {
-            return new PatternAction(PatternActionType.CAST_MULTI, 10, spells, List.of(), interval, 0);
+        // 修正：引数の duration をちゃんと渡す
+        public static PatternAction moveSpell(AbstractSpell spell, int level, int duration) {
+            return new PatternAction(PatternActionType.MOVE_CAST, duration, List.of(spell), List.of(), 0, level);
         }
     }
 
@@ -424,6 +425,17 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
                     this.setTarget(originalTarget);
                 }
             }
+            case MOVE_CAST -> {
+                if (!action.spells.isEmpty()) {
+                    AbstractSpell spell = action.spells.get(0);
+                    // 1. 先に魔法を詠唱
+                    this.initiateCastSpell(spell, action.spellLevel);
+                    // 2. 魔法処理によって移動が止められた可能性を考慮し、"直後"に移動を命令
+                    if (target != null) {
+                        this.getNavigation().moveTo(target, -MOVEMENT_SPEED);
+                    }
+                }
+            }
         }
     }
 
@@ -493,10 +505,10 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
                 // 魔法詠唱中：ボスの周りを冷気の魔法陣のようにパーティクルが回転
                 for (int i = 0; i < 5; i++) {
                     double angle = RANDOM.nextDouble() * 2 * Math.PI;
-                    double radius = 1.2;
+                    double radius = 1.5;
                     double px = x + Math.cos(angle) * radius;
                     double pz = z + Math.sin(angle) * radius;
-                    this.level().addParticle(ParticleTypes.SOUL, px, y, pz, 0, 0.1, 0);
+                    this.level().addParticle(ParticleTypes.FIREWORK, px, y, pz, 0, 0.1, 0);
                 }
             }
         }
@@ -564,12 +576,16 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
             registerPattern(new ActionPattern("flost_dash", 1, 8.0, 15.0,
                     PatternAction.down(8),
                     PatternAction.spell(Modspellregistry.FROST_DASH.get(), 22),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 25),
                     PatternAction.wait(5),
                     PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 25),
                     PatternAction.down(8),
                     PatternAction.spell(Modspellregistry.FROST_DASH.get(), 22),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 25),
                     PatternAction.wait(5),
                     PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 25),
                     PatternAction.spell(Modspellregistry.FROST_DASH.get(), 30)
             ));
 
@@ -642,45 +658,70 @@ public class FromazenEntity extends AbstractSpellCastingMob implements Enemy {
             //ここから2
 
             registerPattern(new ActionPattern("ice_spike_strike", 1, 12.0, 16.0,
-                    PatternAction.down(60),
-                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30),
+                    PatternAction.moveSpell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30, -50),
                     PatternAction.wait(5),
-                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30),
+                    PatternAction.moveSpell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30, -50),
                     PatternAction.wait(5),
-                    PatternAction.spell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30),
-                    PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
+                    PatternAction.moveSpell(SpellRegistry.ICE_SPIKES_SPELL.get(), 30, -50),
+                    PatternAction.moveSpell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30, -100),
                     PatternAction.wait(1),
-                    PatternAction.spell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30),
+                    PatternAction.moveSpell(SpellRegistry.RAY_OF_FROST_SPELL.get(), 30, -100),
                     PatternAction.move(-60),
                     PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
                     PatternAction.move(-300),
-                    PatternAction.wait(5)
-            ));
+                    PatternAction.wait(5),
+                    PatternAction.spell(SpellRegistry.HEAL_SPELL.get(), 10)
+                    ));
             registerPattern(new ActionPattern("strong_frost_dash", 1, 0.0, 12.0,
                     PatternAction.spell(Modspellregistry.FROST_DASH.get(), 40),
                     PatternAction.spell(Modspellregistry.FROST_DASH.get(), 40),
                     PatternAction.spell(Modspellregistry.FROST_DASH.get(), 40),
                     PatternAction.spell(Modspellregistry.FROST_DASH.get(), 40),
                     PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
+                    PatternAction.spell(SpellRegistry.HEAL_SPELL.get(), 5),
                     PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30),
-                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 30)
+                    PatternAction.spell(SpellRegistry.HEAL_SPELL.get(), 30),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 5)
             ));
-            registerPattern(new ActionPattern("ice_bomb", 1, 10.0, 90.0,
+            registerPattern(new ActionPattern("ice_bomb", 1, 10.0, 20.0,
+                    PatternAction.moveSpell(SpellRegistry.ICICLE_SPELL.get(), 50, 50),
                     PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 50),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 80),
                     PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 50),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 80),
                     PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 50),
-                    PatternAction.spell(SpellRegistry.ICICLE_SPELL.get(), 50),
-                    PatternAction.move(-100),
-                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 50),
-                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 50),
-                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 50),
-                    PatternAction.move(-100),
-                    PatternAction.spell(Modspellregistry.SNOWFLAKE.get(), 50),
-                    PatternAction.spell(Modspellregistry.SNOWFLAKE.get(), 50),
-                    PatternAction.spell(Modspellregistry.SNOWFLAKE.get(), 50),
+                    PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 80),
+                    PatternAction.move(-400),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 70),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 70),
+                    PatternAction.spell(Modspellregistry.SWING_SNOW_BALL.get(), 70),
+                    PatternAction.moveSpell(Modspellregistry.FROST_ENSTROSITY.get(), 20, 90),
+                    PatternAction.move(-200),
+                    PatternAction.moveSpell(Modspellregistry.SNOWFLAKE.get(), 50, -12),
+                    PatternAction.moveSpell(Modspellregistry.SNOWFLAKE.get(), 50, -12),
+                    PatternAction.moveSpell(Modspellregistry.SNOWFLAKE.get(), 50, -12),
                     PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
                     PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100)
             ));
+        registerPattern(new ActionPattern("ice_step", 1, 20.0, 30.0,
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100),
+                PatternAction.spell(SpellRegistry.FROST_STEP_SPELL.get(), 100)
+        ));
     }
 
     @Override

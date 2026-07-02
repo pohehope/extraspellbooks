@@ -6,6 +6,7 @@ import net.minecraftforge.registries.RegistryObject;
 import org.pohehope.extraspellbooks.spells.blood.HemostasisSpell;
 import org.pohehope.extraspellbooks.spells.fire.BurningSoulSpell;
 import org.pohehope.extraspellbooks.spells.ice.*;
+import org.pohehope.extraspellbooks.spells.lightning.PlasmaStepSpell;
 import org.pohehope.extraspellbooks.spells.night.MeteorShowerSpell;
 import org.pohehope.extraspellbooks.spells.night.UnderMoonSpell;
 import org.pohehope.extraspellbooks.spells.lightning.LowVoltagemissileSpell;
@@ -61,4 +62,9 @@ public class Modspellregistry {
 
     public static final RegistryObject<AbstractSpell> FROST_DASH =
             SPELLS.register("frost_dash", FrostDashSpell::new);
+
+    public static final RegistryObject<AbstractSpell> FROST_ENSTROSITY =
+            SPELLS.register("frost_enstrosity", FrostEnstrositySpell::new);
+    public static final RegistryObject<AbstractSpell> PLASMA_STEP =
+            SPELLS.register("plasma_step", PlasmaStepSpell::new);
 }
