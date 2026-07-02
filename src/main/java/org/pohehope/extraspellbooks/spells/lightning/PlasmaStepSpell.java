@@ -5,6 +5,7 @@ import io.redspace.ironsspellbooks.api.magic.MagicData;
 import io.redspace.ironsspellbooks.api.registry.SchoolRegistry;
 import io.redspace.ironsspellbooks.api.spells.*;
 import io.redspace.ironsspellbooks.capabilities.magic.ImpulseCastData;
+import io.redspace.ironsspellbooks.capabilities.magic.RecastInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.TickTask;
 import net.minecraft.util.Mth;
@@ -28,7 +29,7 @@ public class PlasmaStepSpell extends AbstractSpell {
         return new DefaultConfig()
                 .setSchoolResource(SchoolRegistry.LIGHTNING_RESOURCE)//属性
                 .setMinRarity(SpellRarity.RARE)//最低レア度
-                .setCooldownSeconds(60)//クールダウン
+                .setCooldownSeconds(10)//クールダウン
                 .setMaxLevel(6).build();//最大レベル
     }
 
@@ -66,6 +67,9 @@ public class PlasmaStepSpell extends AbstractSpell {
 
     @Override
     public void onCast(Level level, int spellLevel, LivingEntity caster, CastSource castSource, MagicData playerMagicData) {
+        if (!playerMagicData.getPlayerRecasts().hasRecastForSpell(getSpellId())) {
+            playerMagicData.getPlayerRecasts().addRecast(new RecastInstance(getSpellId(), spellLevel, getRecastCount(spellLevel, caster), 180, castSource, null), playerMagicData);
+        }
         var teleportData = (TeleportData) playerMagicData.getAdditionalCastData();
         Vec3 dest = null;
         if (teleportData != null) {
